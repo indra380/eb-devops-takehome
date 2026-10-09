@@ -1,0 +1,28 @@
+replicaCount: 2
+
+image:
+  repository: demo-service
+  tag: "1.0.0"
+  pullPolicy: IfNotPresent
+
+config:
+  appName: demo
+  version: "1.0.0"
+
+service:
+  port: 80
+  targetPort: 8080
+
+ingress:
+  className: nginx
+  host: demo.local
+  path: /
+  pathType: Prefix
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    cpu: 200m
+    memory: 128Mi
