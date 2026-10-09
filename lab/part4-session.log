@@ -1,0 +1,737 @@
+﻿===== Part 4 debug session =====
+Host: Windows, PowerShell transcript-style log (script/asciinema not installed)
+Started: 2026-10-10T02:09:26.4171913+05:30
+Context: kind-demo
+
+$ cd '/c/Technical assignment/lab' && ./scenario.sh up
+==> applying cluster environment (cluster-state/)
+namespace/debug-lab created
+bash.exe : Error from server (NotFound): error when creating "cluster-state\\limits.yaml": namespaces "debug-lab" not 
+found
+At C:\Users\IndrakumarM\AppData\Local\Temp\ps-script-53f2b070-24a6-4c1f-9899-8a29161e9613.ps1:123 char:10
++   $out = & "C:\Program Files\Git\bin\bash.exe" -c $cmd 2>&1 | Out-Str ...
++          ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Error from serv...-lab" not found:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+==> installing the broken chart
+Release "debug-lab" does not exist. Installing it now.
+Error: 1 error occurred:
+	* Job.batch "migrate" is invalid: spec.template.spec.restartPolicy: Required value: valid values: "OnFailure", "Never"
+
+
+
+[2mhelm reported an error. That is not your machine misbehaving ΓÇö[0m
+[2mit is part of the exercise. Read the error; it is evidence.[0m
+
+Lab is (partially) installed. Investigate with kubectl, fix the chart,
+re-run './scenario.sh up' to apply your fixes, and './scenario.sh verify'
+to check progress.
+
+
+$ kubectl apply -f '/c/Technical assignment/lab/cluster-state/limits.yaml'
+limitrange/debug-lab-guardrails created
+
+
+$ kubectl -n debug-lab get all,sa,role,rolebinding,limitrange
+NAME                            READY   STATUS                       RESTARTS   AGE
+pod/backend-5cb957846d-4clcf    0/1     CreateContainerConfigError   0          13s
+pod/gateway-789b7b6656-b7qmk    0/1     ContainerCreating            0          13s
+pod/metrics-6ff48bbdc7-w84mk    0/1     CreateContainerConfigError   0          13s
+pod/reporter-67795687bf-m4s5z   0/1     CreateContainerConfigError   0          13s
+pod/worker-f58fd49b-6l2z9       0/1     CreateContainerConfigError   0          13s
+
+NAME               TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)    AGE
+service/backend    ClusterIP   10.96.198.238   <none>        8080/TCP   13s
+service/gateway    ClusterIP   10.96.118.88    <none>        80/TCP     13s
+service/reporter   ClusterIP   10.96.210.241   <none>        8080/TCP   13s
+
+NAME                       READY   UP-TO-DATE   AVAILABLE   AGE
+deployment.apps/backend    0/1     1            0           13s
+deployment.apps/gateway    0/1     1            0           13s
+deployment.apps/metrics    0/1     1            0           13s
+deployment.apps/reporter   0/1     1            0           13s
+deployment.apps/worker     0/1     1            0           13s
+
+NAME                                  DESIRED   CURRENT   READY   AGE
+replicaset.apps/backend-5cb957846d    1         1         0       13s
+replicaset.apps/gateway-789b7b6656    1         1         0       13s
+replicaset.apps/metrics-6ff48bbdc7    1         1         0       13s
+replicaset.apps/reporter-67795687bf   1         1         0       13s
+replicaset.apps/worker-f58fd49b       1         1         0       13s
+
+NAME                      SECRETS   AGE
+serviceaccount/default    0         14s
+serviceaccount/reporter   0         13s
+
+NAME                                           CREATED AT
+role.rbac.authorization.k8s.io/reporter-read   2026-10-09T20:39:27Z
+
+NAME                                                  ROLE                 AGE
+rolebinding.rbac.authorization.k8s.io/reporter-read   Role/reporter-read   13s
+
+NAME                              CREATED AT
+limitrange/debug-lab-guardrails   2026-10-09T20:39:40Z
+
+
+$ kubectl -n debug-lab get pods -o wide
+NAME                        READY   STATUS                       RESTARTS   AGE   IP            NODE                 NOMINATED NODE   READINESS GATES
+backend-5cb957846d-4clcf    0/1     CreateContainerConfigError   0          13s   10.244.0.12   demo-control-plane   <none>           <none>
+gateway-789b7b6656-b7qmk    0/1     ContainerCreating            0          13s   <none>        demo-control-plane   <none>           <none>
+metrics-6ff48bbdc7-w84mk    0/1     CreateContainerConfigError   0          13s   10.244.0.15   demo-control-plane   <none>           <none>
+reporter-67795687bf-m4s5z   0/1     CreateContainerConfigError   0          13s   10.244.0.13   demo-control-plane   <none>           <none>
+worker-f58fd49b-6l2z9       0/1     CreateContainerConfigError   0          13s   10.244.0.14   demo-control-plane   <none>           <none>
+
+
+$ cd '/c/Technical assignment/lab' && ./scenario.sh verify
+==> verifying goal state in namespace debug-lab
+  [31mFAIL[0m  migrate Job has not completed (does it exist? did the chart even install cleanly?)
+  [31mFAIL[0m  deployment backend: 0/1 ready
+  [31mFAIL[0m  deployment gateway: 0/1 ready
+  [31mFAIL[0m  deployment worker: 0/1 ready
+  [31mFAIL[0m  deployment reporter: 0/1 ready
+  [31mFAIL[0m  deployment metrics: 0/1 ready
+  [32mPASS[0m  no pods in CrashLoopBackOff
+  [31mFAIL[0m  ServiceAccount debug-lab/reporter cannot list pods
+  [31mFAIL[0m  backend does not answer on http://backend:8080/healthz
+  [31mFAIL[0m  gateway /status does not report backend=ok
+  [31mFAIL[0m  reporter /report does not return a pod count
+
+[31m10 check(s) failing[0m, 1 passing. Keep digging ΓÇö every failure is a symptom.
+
+
+$ kubectl -n debug-lab describe pod -l app=backend | sed -n '/Events:/,\; /Warning/p; /Error/p; /State:/,/Ready:/p'
+bash.exe : sed: -e expression #1, char 26: unknown command: `/'
+At C:\Users\IndrakumarM\AppData\Local\Temp\ps-script-2e9a329c-b7f2-45a3-b8f3-301acfa6f651.ps1:117 char:10
++   $out = & "C:\Program Files\Git\bin\bash.exe" -c $cmd 2>&1 | Out-Str ...
++          ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (sed: -e express...wn command: `/':String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+
+
+$ kubectl -n debug-lab get pod -l app=backend -o jsonpath='{.items[0].status.containerStatuses[0].state}'
+{"waiting":{"message":"container has runAsNonRoot and image has non-numeric user (nonroot), cannot verify user is non-root (pod: \"backend-5cb957846d-4clcf_debug-lab(627a5938-c421-42f7-9757-778582c4d155)\", container: backend)","reason":"CreateContainerConfigError"}}
+
+
+$ kubectl -n debug-lab describe pod -l app=metrics
+Name:             metrics-6ff48bbdc7-w84mk
+Namespace:        debug-lab
+Priority:         0
+Service Account:  default
+Node:             demo-control-plane/172.18.0.2
+Start Time:       Sat, 10 Oct 2026 02:09:27 +0530
+Labels:           app=metrics
+                  app.kubernetes.io/managed-by=Helm
+                  app.kubernetes.io/part-of=eb-debug-lab
+                  helm.sh/chart=debug-lab-2.0.0
+                  pod-template-hash=6ff48bbdc7
+Annotations:      <none>
+Status:           Pending
+IP:               10.244.0.15
+IPs:
+  IP:           10.244.0.15
+Controlled By:  ReplicaSet/metrics-6ff48bbdc7
+Containers:
+  metrics:
+    Container ID:   
+    Image:          docker.io/ebinterview/eb-debug-app:1.0.1
+    Image ID:       
+    Port:           8080/TCP (http)
+    Host Port:      0/TCP (http)
+    State:          Waiting
+      Reason:       CreateContainerConfigError
+    Ready:          False
+    Restart Count:  0
+    Limits:
+      cpu:     4
+      memory:  128Mi
+    Requests:
+      cpu:      2
+      memory:   64Mi
+    Readiness:  http-get http://:8080/healthz delay=3s timeout=3s period=5s #success=1 #failure=3
+    Environment:
+      APP_MODE:  api
+      APP_NAME:  metrics
+      VERSION:   2.0.0
+    Mounts:
+      /var/run/secrets/kubernetes.io/serviceaccount from kube-api-access-vf9qg (ro)
+Conditions:
+  Type                        Status
+  PodReadyToStartContainers   True 
+  Initialized                 True 
+  Ready                       False 
+  ContainersReady             False 
+  PodScheduled                True 
+Volumes:
+  kube-api-access-vf9qg:
+    Type:                    Projected (a volume that contains injected data from multiple sources)
+    TokenExpirationSeconds:  3607
+    ConfigMapName:           kube-root-ca.crt
+    Optional:                false
+    DownwardAPI:             true
+QoS Class:                   Burstable
+Node-Selectors:              <none>
+Tolerations:                 node.kubernetes.io/not-ready:NoExecute op=Exists for 300s
+                             node.kubernetes.io/unreachable:NoExecute op=Exists for 300s
+Events:
+  Type     Reason     Age                From               Message
+  ----     ------     ----               ----               -------
+  Normal   Scheduled  35s                default-scheduler  Successfully assigned debug-lab/metrics-6ff48bbdc7-w84mk to demo-control-plane
+  Normal   Pulling    34s                kubelet            spec.containers{metrics}: Pulling image "docker.io/ebinterview/eb-debug-app:1.0.1"
+  Normal   Pulled     25s                kubelet            spec.containers{metrics}: Successfully pulled image "docker.io/ebinterview/eb-debug-app:1.0.1" in 1.709s (9.507s including waiting). Image size: 3279587 bytes.
+  Warning  Failed     13s (x3 over 25s)  kubelet            spec.containers{metrics}: Error: container has runAsNonRoot and image has non-numeric user (nonroot), cannot verify user is non-root (pod: "metrics-6ff48bbdc7-w84mk_debug-lab(0aaa8829-6e70-4fd2-820a-9cb75b765f7a)", container: metrics)
+  Normal   Pulled     13s (x2 over 24s)  kubelet            spec.containers{metrics}: Container image "docker.io/ebinterview/eb-debug-app:1.0.1" already present on machine
+
+
+$ kubectl auth can-i list pods -n debug-lab --as=system:serviceaccount:debug-lab:reporter; echo exit:\True
+no
+exit:True
+
+
+$ kubectl -n debug-lab get rolebinding reporter-read -o yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  annotations:
+    meta.helm.sh/release-name: debug-lab
+    meta.helm.sh/release-namespace: debug-lab
+  creationTimestamp: "2026-10-09T20:39:27Z"
+  labels:
+    app: reporter
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/part-of: eb-debug-lab
+    helm.sh/chart: debug-lab-2.0.0
+  name: reporter-read
+  namespace: debug-lab
+  resourceVersion: "1079"
+  uid: 8e07437d-281f-4207-b5ec-b201496885a4
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: reporter-read
+subjects:
+- kind: ServiceAccount
+  name: default
+  namespace: debug-lab
+
+
+$ kubectl -n debug-lab get job,pods --show-labels
+NAME                            READY   STATUS                       RESTARTS   AGE   LABELS
+pod/backend-5cb957846d-4clcf    0/1     CreateContainerConfigError   0          36s   app.kubernetes.io/managed-by=Helm,app.kubernetes.io/part-of=eb-debug-lab,app=backend,helm.sh/chart=debug-lab-2.0.0,pod-template-hash=5cb957846d
+pod/gateway-789b7b6656-b7qmk    0/1     CreateContainerConfigError   0          36s   app.kubernetes.io/managed-by=Helm,app.kubernetes.io/part-of=eb-debug-lab,app=gateway,helm.sh/chart=debug-lab-2.0.0,pod-template-hash=789b7b6656
+pod/metrics-6ff48bbdc7-w84mk    0/1     CreateContainerConfigError   0          36s   app.kubernetes.io/managed-by=Helm,app.kubernetes.io/part-of=eb-debug-lab,app=metrics,helm.sh/chart=debug-lab-2.0.0,pod-template-hash=6ff48bbdc7
+pod/reporter-67795687bf-m4s5z   0/1     CreateContainerConfigError   0          36s   app.kubernetes.io/managed-by=Helm,app.kubernetes.io/part-of=eb-debug-lab,app=reporter,helm.sh/chart=debug-lab-2.0.0,pod-template-hash=67795687bf
+pod/worker-f58fd49b-6l2z9       0/1     CreateContainerConfigError   0          36s   app.kubernetes.io/managed-by=Helm,app.kubernetes.io/part-of=eb-debug-lab,app=worker,helm.sh/chart=debug-lab-2.0.0,pod-template-hash=f58fd49b
+
+
+$ kubectl -n debug-lab delete pod -l app=metrics --wait=false && sleep 2 && kubectl -n debug-lab describe pod -l app=metrics | awk 'BEGIN{p=0} /Events:/{p=1} p'
+pod "metrics-6ff48bbdc7-w84mk" deleted from debug-lab namespace
+bash.exe : No resources found in debug-lab namespace.
+At C:\Users\IndrakumarM\AppData\Local\Temp\ps-script-b574285b-95ca-48c5-a8bb-f2d5e7170692.ps1:117 char:10
++   $out = & "C:\Program Files\Git\bin\bash.exe" -c $cmd 2>&1 | Out-Str ...
++          ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (No resources fo...-lab namespace.:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+
+
+$ docker inspect docker.io/ebinterview/eb-debug-app:1.0.1 --format '{{.Config.User}}'
+nonroot
+
+
+$ docker cp /etc/passwd and /etc/group
+root:x:0:0:root:/root:/sbin/nologin
+nobody:x:65534:65534:nobody:/nonexistent:/sbin/nologin
+nonroot:x:65532:65532:nonroot:/home/nonroot:/sbin/nologin
+
+root:x:0:
+nobody:x:65534:
+tty:x:5:
+staff:x:50:
+nonroot:x:65532:
+
+
+$ kubectl -n debug-lab describe deploy metrics
+Name:                   metrics
+Namespace:              debug-lab
+CreationTimestamp:      Sat, 10 Oct 2026 02:09:27 +0530
+Labels:                 app=metrics
+                        app.kubernetes.io/managed-by=Helm
+                        app.kubernetes.io/part-of=eb-debug-lab
+                        helm.sh/chart=debug-lab-2.0.0
+Annotations:            deployment.kubernetes.io/revision: 1
+                        meta.helm.sh/release-name: debug-lab
+                        meta.helm.sh/release-namespace: debug-lab
+Selector:               app=metrics
+Replicas:               1 desired | 0 updated | 0 total | 0 available | 1 unavailable
+StrategyType:           RollingUpdate
+MinReadySeconds:        0
+RollingUpdateStrategy:  25% max unavailable, 25% max surge
+Pod Template:
+  Labels:  app=metrics
+           app.kubernetes.io/managed-by=Helm
+           app.kubernetes.io/part-of=eb-debug-lab
+           helm.sh/chart=debug-lab-2.0.0
+  Containers:
+   metrics:
+    Image:      docker.io/ebinterview/eb-debug-app:1.0.1
+    Port:       8080/TCP (http)
+    Host Port:  0/TCP (http)
+    Limits:
+      cpu:     4
+      memory:  128Mi
+    Requests:
+      cpu:      2
+      memory:   64Mi
+    Readiness:  http-get http://:8080/healthz delay=3s timeout=3s period=5s #success=1 #failure=3
+    Environment:
+      APP_MODE:    api
+      APP_NAME:    metrics
+      VERSION:     2.0.0
+    Mounts:        <none>
+  Volumes:         <none>
+  Node-Selectors:  <none>
+  Tolerations:     <none>
+Conditions:
+  Type             Status  Reason
+  ----             ------  ------
+  Available        False   MinimumReplicasUnavailable
+  Progressing      True    ReplicaSetUpdated
+  ReplicaFailure   True    FailedCreate
+OldReplicaSets:    <none>
+NewReplicaSet:     metrics-6ff48bbdc7 (0/1 replicas created)
+Events:
+  Type    Reason             Age   From                   Message
+  ----    ------             ----  ----                   -------
+  Normal  ScalingReplicaSet  95s   deployment-controller  Scaled up replica set metrics-6ff48bbdc7 from 0 to 1
+
+
+$ kubectl -n debug-lab get events --sort-by=.lastTimestamp | tail -n 30
+89s         Normal    Pulled              pod/reporter-67795687bf-m4s5z    Successfully pulled image "docker.io/ebinterview/eb-debug-app:1.0.1" in 6.225s (6.225s including waiting). Image size: 3279587 bytes.
+88s         Normal    Pulled              pod/backend-5cb957846d-4clcf     Successfully pulled image "docker.io/ebinterview/eb-debug-app:1.0.1" in 1.603s (7.827s including waiting). Image size: 3279587 bytes.
+86s         Normal    Pulled              pod/metrics-6ff48bbdc7-w84mk     Successfully pulled image "docker.io/ebinterview/eb-debug-app:1.0.1" in 1.709s (9.507s including waiting). Image size: 3279587 bytes.
+84s         Normal    Pulled              pod/worker-f58fd49b-6l2z9        Successfully pulled image "docker.io/ebinterview/eb-debug-app:1.0.1" in 1.666s (11.135s including waiting). Image size: 3279587 bytes.
+83s         Normal    Pulled              pod/gateway-789b7b6656-b7qmk     Successfully pulled image "docker.io/ebinterview/eb-debug-app:1.0.1" in 1.472s (12.579s including waiting). Image size: 3279587 bytes.
+81s         Normal    Scheduled           pod/eb-verify-probe              Successfully assigned debug-lab/eb-verify-probe to demo-control-plane
+80s         Normal    Pulling             pod/eb-verify-probe              Pulling image "busybox:1.36"
+74s         Normal    Created             pod/eb-verify-probe              Created container: eb-verify-probe
+74s         Normal    Pulled              pod/eb-verify-probe              Successfully pulled image "busybox:1.36" in 6.252s (6.252s including waiting). Image size: 2217006 bytes.
+74s         Normal    Started             pod/eb-verify-probe              Started container eb-verify-probe
+34s         Normal    Pulled              pod/metrics-6ff48bbdc7-w84mk     Container image "docker.io/ebinterview/eb-debug-app:1.0.1" already present on machine
+34s         Warning   Failed              pod/metrics-6ff48bbdc7-w84mk     Error: container has runAsNonRoot and image has non-numeric user (nonroot), cannot verify user is non-root (pod: "metrics-6ff48bbdc7-w84mk_debug-lab(0aaa8829-6e70-4fd2-820a-9cb75b765f7a)", container: metrics)
+28s         Warning   FailedCreate        replicaset/metrics-6ff48bbdc7    Error creating: pods "metrics-6ff48bbdc7-h8str" is forbidden: maximum cpu usage per Container is 1, but limit is 4
+28s         Warning   FailedCreate        replicaset/metrics-6ff48bbdc7    Error creating: pods "metrics-6ff48bbdc7-7j7fs" is forbidden: maximum cpu usage per Container is 1, but limit is 4
+28s         Warning   FailedCreate        replicaset/metrics-6ff48bbdc7    Error creating: pods "metrics-6ff48bbdc7-klqft" is forbidden: maximum cpu usage per Container is 1, but limit is 4
+28s         Warning   FailedCreate        replicaset/metrics-6ff48bbdc7    Error creating: pods "metrics-6ff48bbdc7-6xs8b" is forbidden: maximum cpu usage per Container is 1, but limit is 4
+28s         Warning   FailedCreate        replicaset/metrics-6ff48bbdc7    Error creating: pods "metrics-6ff48bbdc7-fprnd" is forbidden: maximum cpu usage per Container is 1, but limit is 4
+28s         Warning   FailedCreate        replicaset/metrics-6ff48bbdc7    Error creating: pods "metrics-6ff48bbdc7-fcz2f" is forbidden: maximum cpu usage per Container is 1, but limit is 4
+28s         Warning   FailedCreate        replicaset/metrics-6ff48bbdc7    Error creating: pods "metrics-6ff48bbdc7-7wlzz" is forbidden: maximum cpu usage per Container is 1, but limit is 4
+27s         Warning   FailedCreate        replicaset/metrics-6ff48bbdc7    Error creating: pods "metrics-6ff48bbdc7-kdvbf" is forbidden: maximum cpu usage per Container is 1, but limit is 4
+27s         Warning   FailedCreate        replicaset/metrics-6ff48bbdc7    Error creating: pods "metrics-6ff48bbdc7-pxddc" is forbidden: maximum cpu usage per Container is 1, but limit is 4
+13s         Normal    Pulled              pod/gateway-789b7b6656-b7qmk     Container image "docker.io/ebinterview/eb-debug-app:1.0.1" already present on machine
+13s         Warning   Failed              pod/gateway-789b7b6656-b7qmk     Error: container has runAsNonRoot and image has non-numeric user (nonroot), cannot verify user is non-root (pod: "gateway-789b7b6656-b7qmk_debug-lab(d81abfaa-9e25-40bf-8b68-bc360d6f2bbc)", container: gateway)
+12s         Warning   FailedCreate        replicaset/metrics-6ff48bbdc7    (combined from similar events): Error creating: pods "metrics-6ff48bbdc7-4wbvz" is forbidden: maximum cpu usage per Container is 1, but limit is 4
+8s          Normal    Pulled              pod/backend-5cb957846d-4clcf     Container image "docker.io/ebinterview/eb-debug-app:1.0.1" already present on machine
+8s          Warning   Failed              pod/backend-5cb957846d-4clcf     Error: container has runAsNonRoot and image has non-numeric user (nonroot), cannot verify user is non-root (pod: "backend-5cb957846d-4clcf_debug-lab(627a5938-c421-42f7-9757-778582c4d155)", container: backend)
+7s          Warning   Failed              pod/worker-f58fd49b-6l2z9        Error: container has runAsNonRoot and image has non-numeric user (nonroot), cannot verify user is non-root (pod: "worker-f58fd49b-6l2z9_debug-lab(546f655e-1fa5-4784-8c9b-735d686c071d)", container: worker)
+7s          Normal    Pulled              pod/worker-f58fd49b-6l2z9        Container image "docker.io/ebinterview/eb-debug-app:1.0.1" already present on machine
+1s          Normal    Pulled              pod/reporter-67795687bf-m4s5z    Container image "docker.io/ebinterview/eb-debug-app:1.0.1" already present on machine
+1s          Warning   Failed              pod/reporter-67795687bf-m4s5z    Error: container has runAsNonRoot and image has non-numeric user (nonroot), cannot verify user is non-root (pod: "reporter-67795687bf-m4s5z_debug-lab(d0c6a91b-fcf6-4803-99d8-402110ba89f3)", container: reporter)
+
+
+=== local image behavior (cluster pods cannot start yet) ===
+
+$ docker run --rm -e APP_MODE=api -e APP_NAME=backend -e VERSION=2.0.0 docker.io/ebinterview/eb-debug-app:1.0.1
+
+still running after 4s (serves HTTP)
+
+2026/10/09 20:41:22 eb-debug-app 2.0.0 starting: mode=api pod=b03539678d5d listening on :8081 (image default is 8081; set PORT to override)
+
+
+$ docker run --rm -e APP_MODE=worker -e APP_NAME=worker -e VERSION=2.0.0 docker.io/ebinterview/eb-debug-app:1.0.1
+
+exited 
+
+2026/10/09 20:41:26 FATAL: worker could not initialise its cache: mkdir /var/cache/app: permission denied â€” the process needs a writable directory at /var/cache/app (mount a volume there, or set CACHE_DIR)
+
+
+$ docker run --rm -e APP_MODE=gateway -e APP_NAME=gateway -e VERSION=2.0.0 -e BACKEND_URL=http://127.0.0.1:9 docker.io/ebinterview/eb-debug-app:1.0.1
+
+still running after 4s (serves HTTP)
+
+2026/10/09 20:41:27 eb-debug-app 2.0.0 starting: mode=gateway pod=4bc09f5de01e listening on :8081 (image default is 8081; set PORT to override)
+
+
+$ docker run --rm -e APP_MODE=migrate -e APP_NAME=migrate -e VERSION=2.0.0 docker.io/ebinterview/eb-debug-app:1.0.1
+
+exited 
+
+2026/10/09 20:41:31 eb-debug-app 2.0.0: migration starting (app=migrate, 2s of very important work)
+2026/10/09 20:41:33 migration complete
+
+
+$ docker run --rm -e APP_MODE=reporter -e APP_NAME=reporter -e VERSION=2.0.0 -e NAMESPACE=debug-lab docker.io/ebinterview/eb-debug-app:1.0.1
+
+still running after 4s (serves HTTP)
+
+2026/10/09 20:41:33 eb-debug-app 2.0.0 starting: mode=reporter pod=8bb1c058c333 listening on :8081 (image default is 8081; set PORT to override)
+
+
+$ cd '/c/Technical assignment/lab' && ./scenario.sh up
+==> applying cluster environment (cluster-state/)
+limitrange/debug-lab-guardrails unchanged
+namespace/debug-lab unchanged
+==> installing the broken chart
+Release "debug-lab" has been upgraded. Happy Helming!
+NAME: debug-lab
+LAST DEPLOYED: Sat Oct 10 02:14:22 2026
+NAMESPACE: debug-lab
+STATUS: deployed
+REVISION: 2
+TEST SUITE: None
+NOTES:
+debug-lab installed into namespace debug-lab.
+
+Goal state:
+  * migrate Job: Completed
+  * backend, gateway, worker, reporter, metrics: all pods Running and 1/1 Ready
+  * gateway /status reports {"self":"ok","backend":"ok",...}
+
+Check your progress at any time:
+  ./scenario.sh verify
+
+Lab is (partially) installed. Investigate with kubectl, fix the chart,
+re-run './scenario.sh up' to apply your fixes, and './scenario.sh verify'
+to check progress.
+
+
+$ kubectl -n debug-lab get pods,job
+NAME                            READY   STATUS                       RESTARTS     AGE
+pod/backend-57f5646b8d-j89fg    0/1     Running                      0            8s
+pod/backend-5cb957846d-4clcf    0/1     CreateContainerConfigError   0            5m4s
+pod/gateway-5dd59448fb-kxxwv    0/1     Running                      0            8s
+pod/gateway-789b7b6656-b7qmk    0/1     CreateContainerConfigError   0            5m4s
+pod/migrate-m25cr               0/1     Completed                    0            8s
+pod/reporter-67795687bf-m4s5z   0/1     CreateContainerConfigError   0            5m4s
+pod/reporter-6bd6b99989-b2tzk   0/1     Running                      0            8s
+pod/worker-5487dc58f6-p6djd     0/1     CrashLoopBackOff             1 (7s ago)   8s
+pod/worker-f58fd49b-6l2z9       0/1     CreateContainerConfigError   0            5m4s
+
+NAME                STATUS     COMPLETIONS   DURATION   AGE
+job.batch/migrate   Complete   1/1           5s         8s
+
+
+$ kubectl -n debug-lab logs deploy/backend --tail=20
+bash.exe : Found 2 pods, using pod/backend-57f5646b8d-j89fg
+At C:\Users\IndrakumarM\AppData\Local\Temp\ps-script-44e97626-66dd-4e83-a81f-6f064e610154.ps1:117 char:10
++   $out = & "C:\Program Files\Git\bin\bash.exe" -c $cmd 2>&1 | Out-Str ...
++          ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Found 2 pods, u...7f5646b8d-j89fg:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+2026/10/09 20:44:23 eb-debug-app 2.0.0 starting: mode=api pod=backend-57f5646b8d-j89fg listening on :8081 (image default is 8081; set PORT to override)
+
+
+$ kubectl -n debug-lab logs deploy/worker --tail=30
+bash.exe : Found 2 pods, using pod/worker-5487dc58f6-p6djd
+At C:\Users\IndrakumarM\AppData\Local\Temp\ps-script-44e97626-66dd-4e83-a81f-6f064e610154.ps1:117 char:10
++   $out = & "C:\Program Files\Git\bin\bash.exe" -c $cmd 2>&1 | Out-Str ...
++          ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Found 2 pods, u...487dc58f6-p6djd:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+2026/10/09 20:44:24 FATAL: worker could not initialise its cache: mkdir /var/cache/app: read-only file system ΓÇö the process needs a writable directory at /var/cache/app (mount a volume there, or set CACHE_DIR)
+
+
+$ kubectl -n debug-lab logs deploy/gateway --tail=20
+bash.exe : Found 2 pods, using pod/gateway-5dd59448fb-kxxwv
+At C:\Users\IndrakumarM\AppData\Local\Temp\ps-script-44e97626-66dd-4e83-a81f-6f064e610154.ps1:117 char:10
++   $out = & "C:\Program Files\Git\bin\bash.exe" -c $cmd 2>&1 | Out-Str ...
++          ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Found 2 pods, u...dd59448fb-kxxwv:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+2026/10/09 20:44:24 eb-debug-app 2.0.0 starting: mode=gateway pod=gateway-5dd59448fb-kxxwv listening on :8081 (image default is 8081; set PORT to override)
+
+
+$ kubectl -n debug-lab logs job/migrate --tail=20
+2026/10/09 20:44:24 eb-debug-app 2.0.0: migration starting (app=migrate, 2s of very important work)
+2026/10/09 20:44:26 migration complete
+
+
+$ kubectl -n debug-lab describe deploy metrics | awk 'BEGIN{p=0} /Events:/{p=1} p'
+Events:
+  Type    Reason             Age   From                   Message
+  ----    ------             ----  ----                   -------
+  Normal  ScalingReplicaSet  5m5s  deployment-controller  Scaled up replica set metrics-6ff48bbdc7 from 0 to 1
+  Normal  ScalingReplicaSet  9s    deployment-controller  Scaled up replica set metrics-5c775b5b77 from 0 to 1
+
+
+$ kubectl -n debug-lab describe rs -l app=metrics | awk 'BEGIN{p=0} /Events:/{p=1} p'
+
+
+$ kubectl -n debug-lab logs deploy/reporter --tail=30
+bash.exe : Found 2 pods, using pod/reporter-6bd6b99989-b2tzk
+At C:\Users\IndrakumarM\AppData\Local\Temp\ps-script-cda414f4-9205-4894-858a-4f871d6c86ab.ps1:117 char:10
++   $out = & "C:\Program Files\Git\bin\bash.exe" -c $cmd 2>&1 | Out-Str ...
++          ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Found 2 pods, u...bd6b99989-b2tzk:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+2026/10/09 20:44:23 eb-debug-app 2.0.0 starting: mode=reporter pod=reporter-6bd6b99989-b2tzk listening on :8081 (image default is 8081; set PORT to override)
+
+
+$ kubectl -n debug-lab exec deploy/backend -- wget -q -O- -T 3 http://127.0.0.1:8080/healthz; echo exit8080:\True; wget -q -O- -T 3 http://127.0.0.1:8081/healthz; echo exit8081:\True
+bash.exe : error: Internal error occurred: Internal error occurred: error executing command in container: failed to 
+exec in container: failed to start exec "da12f3926f9762df2859b84a2c7079036e52cb8c25200d9fb3462f5414af229c": OCI 
+runtime exec failed: exec failed: unable to start container process: exec: "wget": executable file not found in $PATH
+At C:\Users\IndrakumarM\AppData\Local\Temp\ps-script-cda414f4-9205-4894-858a-4f871d6c86ab.ps1:117 char:10
++   $out = & "C:\Program Files\Git\bin\bash.exe" -c $cmd 2>&1 | Out-Str ...
++          ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (error: Internal... found in $PATH:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+exit8080:True
+/usr/bin/bash: line 1: wget: command not found
+exit8081:True
+
+
+$ kubectl -n debug-lab exec deploy/gateway -- wget -q -O- -T 3 http://127.0.0.1:8081/status; echo; wget -q -O- -T 3 http://127.0.0.1:8081/healthz; echo
+bash.exe : error: Internal error occurred: Internal error occurred: error executing command in container: failed to 
+exec in container: failed to start exec "05b9fdfad20c378747c394bdc824a7edbc50c714d23dfa523b1cf8d1d9139349": OCI 
+runtime exec failed: exec failed: unable to start container process: exec: "wget": executable file not found in $PATH
+At C:\Users\IndrakumarM\AppData\Local\Temp\ps-script-cda414f4-9205-4894-858a-4f871d6c86ab.ps1:117 char:10
++   $out = & "C:\Program Files\Git\bin\bash.exe" -c $cmd 2>&1 | Out-Str ...
++          ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (error: Internal... found in $PATH:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+
+/usr/bin/bash: line 1: wget: command not found
+
+
+
+$ GW=$(kubectl -n debug-lab get pod -l app=gateway --field-selector=status.phase=Running -o jsonpath='{.items[0].status.podIP}')
+BE=$(kubectl -n debug-lab get pod -l app=backend --field-selector=status.phase=Running -o jsonpath='{.items[0].status.podIP}')
+RP=$(kubectl -n debug-lab get pod -l app=reporter --field-selector=status.phase=Running -o jsonpath='{.items[0].status.podIP}')
+echo "gw=$GW be=$BE rp=$RP"
+kubectl -n debug-lab run eb-curl --rm -i --restart=Never --image=busybox:1.36 --quiet --pod-running-timeout=60s --command -- sh -c "echo BACKEND_8080; wget -q -O- -T 3 http://$BE:8080/healthz || echo fail8080; echo; echo BACKEND_8081; wget -q -O- -T 3 http://$BE:8081/healthz || echo fail8081; echo; echo GATEWAY_STATUS; wget -q -O- -T 4 http://$GW:8081/status || echo failgw; echo; echo GATEWAY_HEALTH; wget -q -S -O- -T 3 http://$GW:8081/healthz || true; echo; echo REPORTER; wget -q -S -O- -T 4 http://$RP:8081/report || true; echo"
+gw=10.244.0.19
+
+
+$ kubectl -n debug-lab get events --field-selector involvedObject.name=metrics-5c775b5b77
+LAST SEEN   TYPE      REASON         OBJECT                          MESSAGE
+40s         Warning   FailedCreate   replicaset/metrics-5c775b5b77   Error creating: pods "metrics-5c775b5b77-drjzr" is forbidden: maximum cpu usage per Container is 1, but limit is 4
+40s         Warning   FailedCreate   replicaset/metrics-5c775b5b77   Error creating: pods "metrics-5c775b5b77-pmw6w" is forbidden: maximum cpu usage per Container is 1, but limit is 4
+40s         Warning   FailedCreate   replicaset/metrics-5c775b5b77   Error creating: pods "metrics-5c775b5b77-fqccp" is forbidden: maximum cpu usage per Container is 1, but limit is 4
+40s         Warning   FailedCreate   replicaset/metrics-5c775b5b77   Error creating: pods "metrics-5c775b5b77-kvkvg" is forbidden: maximum cpu usage per Container is 1, but limit is 4
+40s         Warning   FailedCreate   replicaset/metrics-5c775b5b77   Error creating: pods "metrics-5c775b5b77-824mc" is forbidden: maximum cpu usage per Container is 1, but limit is 4
+40s         Warning   FailedCreate   replicaset/metrics-5c775b5b77   Error creating: pods "metrics-5c775b5b77-lvcvm" is forbidden: maximum cpu usage per Container is 1, but limit is 4
+40s         Warning   FailedCreate   replicaset/metrics-5c775b5b77   Error creating: pods "metrics-5c775b5b77-kpdvc" is forbidden: maximum cpu usage per Container is 1, but limit is 4
+40s         Warning   FailedCreate   replicaset/metrics-5c775b5b77   Error creating: pods "metrics-5c775b5b77-95scp" is forbidden: maximum cpu usage per Container is 1, but limit is 4
+39s         Warning   FailedCreate   replicaset/metrics-5c775b5b77   Error creating: pods "metrics-5c775b5b77-x9vhf" is forbidden: maximum cpu usage per Container is 1, but limit is 4
+20s         Warning   FailedCreate   replicaset/metrics-5c775b5b77   (combined from similar events): Error creating: pods "metrics-5c775b5b77-p6jh8" is forbidden: maximum cpu usage per Container is 1, but limit is 4
+
+
+port-forward probes gw=gateway-5dd59448fb-kxxwv be=backend-57f5646b8d-j89fg rp=reporter-6bd6b99989-b2tzk
+
+$ cd '/c/Technical assignment/lab' && ./scenario.sh up
+==> applying cluster environment (cluster-state/)
+limitrange/debug-lab-guardrails unchanged
+namespace/debug-lab unchanged
+==> installing the broken chart
+Release "debug-lab" has been upgraded. Happy Helming!
+NAME: debug-lab
+LAST DEPLOYED: Sat Oct 10 02:16:32 2026
+NAMESPACE: debug-lab
+STATUS: deployed
+REVISION: 3
+TEST SUITE: None
+NOTES:
+debug-lab installed into namespace debug-lab.
+
+Goal state:
+  * migrate Job: Completed
+  * backend, gateway, worker, reporter, metrics: all pods Running and 1/1 Ready
+  * gateway /status reports {"self":"ok","backend":"ok",...}
+
+Check your progress at any time:
+  ./scenario.sh verify
+
+Lab is (partially) installed. Investigate with kubectl, fix the chart,
+re-run './scenario.sh up' to apply your fixes, and './scenario.sh verify'
+to check progress.
+
+
+$ kubectl -n debug-lab get pods,job
+NAME                            READY   STATUS      RESTARTS   AGE
+pod/backend-8498c65f5d-4b22p    1/1     Running     0          20s
+pod/gateway-bbb64c5d5-59lkj     1/1     Running     0          20s
+pod/metrics-7867c5d87-95h7b     1/1     Running     0          20s
+pod/migrate-m25cr               0/1     Completed   0          2m30s
+pod/reporter-5547c46bb7-4smrm   0/1     Running     0          20s
+pod/reporter-6bd6b99989-b2tzk   0/1     Running     0          2m30s
+pod/worker-6757bc98cf-2kxch     1/1     Running     0          20s
+
+NAME                STATUS     COMPLETIONS   DURATION   AGE
+job.batch/migrate   Complete   1/1           5s         2m30s
+
+
+$ kubectl -n debug-lab logs deploy/worker --tail=15
+2026/10/09 20:46:34 eb-debug-app 2.0.0 starting: mode=worker pod=worker-6757bc98cf-2kxch listening on :8080 (image default is 8081; set PORT to override)
+2026/10/09 20:46:40 GET /healthz -> 200 (from 10.244.0.1:44920)
+2026/10/09 20:46:45 GET /healthz -> 200 (from 10.244.0.1:59540)
+2026/10/09 20:46:50 GET /healthz -> 200 (from 10.244.0.1:59552)
+
+
+$ kubectl -n debug-lab logs deploy/gateway --tail=15
+2026/10/09 20:46:34 eb-debug-app 2.0.0 starting: mode=gateway pod=gateway-bbb64c5d5-59lkj listening on :8080 (image default is 8081; set PORT to override)
+2026/10/09 20:46:41 GET /healthz -> 200 (from 10.244.0.1:57012)
+2026/10/09 20:46:46 GET /healthz -> 200 (from 10.244.0.1:57022)
+2026/10/09 20:46:51 GET /healthz -> 200 (from 10.244.0.1:47722)
+
+
+$ cd '/c/Technical assignment/lab' && ./scenario.sh verify
+==> verifying goal state in namespace debug-lab
+  [32mPASS[0m  migrate Job completed
+  [32mPASS[0m  deployment backend: 1/1 ready
+  [32mPASS[0m  deployment gateway: 1/1 ready
+  [32mPASS[0m  deployment worker: 1/1 ready
+  [31mFAIL[0m  deployment reporter: 0/1 ready
+  [32mPASS[0m  deployment metrics: 1/1 ready
+  [32mPASS[0m  no pods in CrashLoopBackOff
+  [32mPASS[0m  ServiceAccount debug-lab/reporter can list pods
+  [32mPASS[0m  backend answers on http://backend:8080/healthz
+  [32mPASS[0m  gateway /status reports backend=ok
+  [31mFAIL[0m  reporter /report does not return a pod count
+
+[31m2 check(s) failing[0m, 9 passing. Keep digging ΓÇö every failure is a symptom.
+
+
+$ kubectl -n debug-lab logs pod/reporter-5547c46bb7-4smrm --tail=40
+2026/10/09 20:46:34 eb-debug-app 2.0.0 starting: mode=reporter pod=reporter-5547c46bb7-4smrm listening on :8080 (image default is 8081; set PORT to override)
+2026/10/09 20:46:40 pod list failed: parse pod list: unexpected end of JSON input
+2026/10/09 20:46:40 GET /healthz -> 503 (from 10.244.0.1:40668)
+2026/10/09 20:46:45 GET /healthz -> 503 (from 10.244.0.1:46452)
+2026/10/09 20:46:50 pod list failed: parse pod list: unexpected end of JSON input
+2026/10/09 20:46:50 GET /healthz -> 503 (from 10.244.0.1:46458)
+2026/10/09 20:46:55 GET /healthz -> 503 (from 10.244.0.1:32870)
+2026/10/09 20:47:00 pod list failed: parse pod list: unexpected end of JSON input
+2026/10/09 20:47:00 GET /healthz -> 503 (from 10.244.0.1:32884)
+2026/10/09 20:47:05 GET /healthz -> 503 (from 10.244.0.1:46962)
+2026/10/09 20:47:10 pod list failed: parse pod list: unexpected end of JSON input
+2026/10/09 20:47:10 GET /healthz -> 503 (from 10.244.0.1:46966)
+
+
+$ kubectl -n debug-lab describe pod/reporter-5547c46bb7-4smrm
+Name:             reporter-5547c46bb7-4smrm
+Namespace:        debug-lab
+Priority:         0
+Service Account:  reporter
+Node:             demo-control-plane/172.18.0.2
+Start Time:       Sat, 10 Oct 2026 02:16:33 +0530
+Labels:           app=reporter
+                  app.kubernetes.io/managed-by=Helm
+                  app.kubernetes.io/part-of=eb-debug-lab
+                  helm.sh/chart=debug-lab-2.0.0
+                  pod-template-hash=5547c46bb7
+Annotations:      <none>
+Status:           Running
+IP:               10.244.0.26
+IPs:
+  IP:           10.244.0.26
+Controlled By:  ReplicaSet/reporter-5547c46bb7
+Containers:
+  reporter:
+    Container ID:   containerd://fb4781fd92b15402f2575c62343edd822afe561758bb1a905c03b104282e984f
+    Image:          docker.io/ebinterview/eb-debug-app:1.0.1
+    Image ID:       docker.io/ebinterview/eb-debug-app@sha256:17f41698c10f5c18693339281b92d3cfef16d9fcffcad440a24e7ab19e05c443
+    Port:           8080/TCP (http)
+    Host Port:      0/TCP (http)
+    State:          Running
+      Started:      Sat, 10 Oct 2026 02:16:34 +0530
+    Ready:          False
+    Restart Count:  0
+    Limits:
+      cpu:     200m
+      memory:  128Mi
+    Requests:
+      cpu:      50m
+      memory:   64Mi
+    Readiness:  http-get http://:8080/healthz delay=3s timeout=3s period=5s #success=1 #failure=3
+    Environment:
+      PORT:       8080
+      NAMESPACE:  debug-lab (v1:metadata.namespace)
+      APP_MODE:   reporter
+      APP_NAME:   reporter
+      VERSION:    2.0.0
+    Mounts:
+      /var/run/secrets/kubernetes.io/serviceaccount from kube-api-access-nq6z2 (ro)
+Conditions:
+  Type                        Status
+  PodReadyToStartContainers   True 
+  Initialized                 True 
+  Ready                       False 
+  ContainersReady             False 
+  PodScheduled                True 
+Volumes:
+  kube-api-access-nq6z2:
+    Type:                    Projected (a volume that contains injected data from multiple sources)
+    TokenExpirationSeconds:  3607
+    ConfigMapName:           kube-root-ca.crt
+    Optional:                false
+    DownwardAPI:             true
+QoS Class:                   Burstable
+Node-Selectors:              <none>
+Tolerations:                 node.kubernetes.io/not-ready:NoExecute op=Exists for 300s
+                             node.kubernetes.io/unreachable:NoExecute op=Exists for 300s
+Events:
+  Type     Reason     Age               From               Message
+  ----     ------     ----              ----               -------
+  Normal   Scheduled  39s               default-scheduler  Successfully assigned debug-lab/reporter-5547c46bb7-4smrm to demo-control-plane
+  Normal   Pulled     38s               kubelet            spec.containers{reporter}: Container image "docker.io/ebinterview/eb-debug-app:1.0.1" already present on machine
+  Normal   Created    38s               kubelet            spec.containers{reporter}: Created container: reporter
+  Normal   Started    38s               kubelet            spec.containers{reporter}: Started container reporter
+  Warning  Unhealthy  2s (x7 over 32s)  kubelet            spec.containers{reporter}: Readiness probe failed: HTTP probe failed with statuscode: 503
+
+
+$ reporter report + API list as the reporter ServiceAccount
+
+$ kubectl debug -n debug-lab pod/reporter-5547c46bb7-4smrm --image=busybox:1.36 --target=reporter --profile=general --attach=false -- sh -c "sleep 30"
+
+$ kubectl -n debug-lab exec reporter-5547c46bb7-4smrm -c debugger-svwjw -- sh -c 'echo TCP; cat /proc/net/tcp /proc/net/tcp6; echo ---; wc -c /proc/1/root/etc/ssl/certs/ca-certificates.crt'
+TCP
+  sl  local_address rem_address   st tx_queue rx_queue tr tm->when retrnsmt   uid  timeout inode                                                     
+   0: 0100007F:ED94 0100007F:1F90 06 00000000:00000000 03:00000000 00000000     0        0 0 3 000000008c5e9fc9                                      
+   1: 0100007F:ED9A 0100007F:1F90 06 00000000:00000000 03:00000000 00000000     0        0 0 3 00000000d98883bd                                      
+  sl  local_address                         remote_address                        st tx_queue rx_queue tr tm->when retrnsmt   uid  timeout inode
+   0: 00000000000000000000000000000000:1F90 00000000000000000000000000000000:0000 0A 00000000:00000000 00:00000000 00000000 65532        0 262642 1 000000005023176c 100 0 0 10 0
+   1: 0000000000000000FFFF00001A00F40A:1F90 0000000000000000FFFF00000100F40A:AF4C 06 00000000:00000000 03:00000679 00000000     0        0 0 3 00000000ea3ca701
+   2: 0000000000000000FFFF00001A00F40A:1F90 0000000000000000FFFF00000100F40A:A3F4 06 00000000:00000000 03:00000000 00000000     0        0 0 3 00000000b202eb0c
+   3: 0000000000000000FFFF00001A00F40A:1F90 0000000000000000FFFF00000100F40A:D17C 06 00000000:00000000 03:0000121E 00000000     0        0 0 3 00000000789f58e3
+   4: 0000000000000000FFFF00001A00F40A:1F90 0000000000000000FFFF00000100F40A:B4AE 06 00000000:00000000 03:00000291 00000000     0        0 0 3 000000001ca63bd3
+   5: 0000000000000000FFFF00001A00F40A:1F90 0000000000000000FFFF00000100F40A:A3FE 06 00000000:00000000 03:000001EE 00000000     0        0 0 3 00000000d160c0a5
+   6: 0000000000000000FFFF00001A00F40A:1F90 0000000000000000FFFF00000100F40A:E726 06 00000000:00000000 03:00000E36 00000000     0        0 0 3 000000009f0b05f4
+   7: 0000000000000000FFFF00001A00F40A:1F90 0000000000000000FFFF00000100F40A:DFBE 06 00000000:00000000 03:00001606 00000000     0        0 0 3 00000000386bef84
+   8: 0000000000000000FFFF00001A00F40A:1F90 0000000000000000FFFF00000100F40A:D24C 06 00000000:00000000 03:00000A61 00000000     0        0 0 3 00000000f071371a
+   9: 0000000000000000FFFF00001A00F40A:1F90 0000000000000000FFFF00000100F40A:E736 06 00000000:00000000 03:0000102C 00000000     0        0 0 3 000000003bd8d11e
+  10: 0000000000000000FFFF00001A00F40A:1F90 0000000000000000FFFF00000100F40A:B4B8 06 00000000:00000000 03:00000488 00000000     0        0 0 3 00000000097a1d1a
+  11: 0000000000000000FFFF00001A00F40A:1F90 0000000000000000FFFF00000100F40A:D188 06 00000000:00000000 03:00001413 00000000     0        0 0 3 0000000089eccf6d
+  12: 0000000000000000FFFF00001A00F40A:1F90 0000000000000000FFFF00000100F40A:AF54 06 00000000:00000000 03:0000086E 00000000     0        0 0 3 000000000540559c
+  13: 0000000000000000FFFF00001A00F40A:1F90 0000000000000000FFFF00000100F40A:E71E 06 00000000:00000000 03:00000DEC 00000000     0        0 0 3 000000003abd04cf
+  14: 0000000000000000FFFF00001A00F40A:1F90 0000000000000000FFFF00000100F40A:D25A 06 00000000:00000000 03:00000C58 00000000     0        0 0 3 000000007a488397
+---
+216591 /proc/1/root/etc/ssl/certs/ca-certificates.crt
+
+
+size-test namespace list bytes 5536
+
+===== final verify after chart fixes =====
+2026-10-10T02:59:30.2237042+05:30
+migrate, backend, gateway, worker, metrics: ready
+reporter: Running but not Ready
+reporter log: pod list failed: parse pod list: unexpected end of JSON input
+GET /healthz -> 503
+ServiceAccount reporter can list pods (RBAC fixed) but /report stays 503
+verify: 2 failing (reporter ready, reporter pod count), 9 passing
