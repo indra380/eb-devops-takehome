@@ -1,0 +1,46 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  chart:
+    name: lint chart
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: v3.17.4
+
+      - name: Lint and render
+        run: |
+          helm lint chart
+          helm template demo chart \
+            --set replicaCount=3 \
+            --set config.appName=ci \
+            --set config.version=0.0.1 \
+            --set ingress.host=ci.local \
+            > /dev/null
+
+  image:
+    name: build and scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build image
+        run: docker build -t demo-service:ci service
+
+      - name: Scan with Trivy
+        run: |
+          docker run --rm \
+            -v /var/run/docker.sock:/var/run/docker.sock \
+            aquasec/trivy:0.58.1 image \
+            --severity HIGH,CRITICAL \
+            --exit-code 1 \
+            --scanners vuln \
+            demo-service:ci
